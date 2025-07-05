@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  postgres_db_prod:
+    container_name: postgres_prod
+    image: postgres:latest
+    restart: always
+    ports:
+      - 5432:5432
+    volumes:
+      - ./dbfiles:/docker-entrypoint-initdb.d
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: qweerty
+      POSTGRES_DB: postgres
+
+  postgres_db_prep:
+    container_name: postgres_prep
+    image: postgres:latest
+    restart: always
+    ports:
+      - 4432:5432
+    volumes:
+      - ./dbfiles:/docker-entrypoint-initdb.d
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: qweerty
+      POSTGRES_DB: postgres
+
+  adminer:
+    container_name: adminer
+    image: adminer
+    restart: always
+    depends_on:
+      - postgres_db_prod
+      - postgres_db_prep
+    ports:
+      - 9090:8080
+
+  billingapp-back-prod:
+    build:
+      context: ./java
+      args:
+        - JAR_FILE=billing-0.0.3-SNAPSHOT.jar
+        - DB_PASSWORD=qweerty
+    container_name: billingapp-back-prod
+    environment:
+      - JAVA_OPTS=
+        -Xms256M
+        -Xmx256M
+    depends_on:
+      - postgres_db_prod
+    ports:
+      - 8080:8080
+
+  billingapp-back-prep:
+    build:
+      context: ./java
+      args:
+        - JAR_FILE=billing-0.0.2-SNAPSHOT.jar
+        - DB_PASSWORD=qweerty
+    container_name: billingapp-back-prep
+    environment:
+      - JAVA_OPTS=
+        -Xms256M
+        -Xmx256M
+    depends_on:
+      - postgres_db_prep
+    ports:
+      - 7080:7080
+
+  billingapp-front-prod:
+    build:
+      context: ./angular
+    container_name: billingapp-front-prod
+    depends_on:
+      - billingapp-back-prod
+    ports:
+      - 80:80
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 250M
+        reservations:
+          cpus: "0.1"
+          memory: 100M
+
+  billingapp-front-prep:
+    build:
+      context: ./angular
+    container_name: billingapp-front-prep
+    depends_on:
+      - billingapp-back-prep
+    ports:
+      - 81:81
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 250M
+        reservations:
+          cpus: "0.1"
+          memory: 100M
+
+
+networks:
+  env_prod:
+    driver: bridge  
+    #activate ipv6
+    driver_opts: 
+            com.docker.network.enable_ipv6: "true"
+    #IP Adress Manager
+    ipam: 
+        driver: default
+        config:
+        - 
+          subnet: 172.16.232.0/24
+          gateway: 172.16.232.1
+        - 
+          subnet: "2001:3974:3979::/64"
+          gateway: "2001:3974:3979::1"
+
+
+  env_prep:   
+    driver: bridge  
+    #activate ipv6
+    driver_opts: 
+            com.docker.network.enable_ipv6: "true"
+    #IP Adress Manager
+    ipam:
+        driver: default
+        config:
+        - 
+          subnet: 172.16.235.0/24
+          gateway: 172.16.235.1
+        - 
+          subnet: "2001:3984:3989::/64"
+          gateway: "2001:3984:3989::1"
